@@ -81,7 +81,7 @@ function [results] = prae(subjectNumber,subjectName,startBlock,skipPrac)
   %% SETUP RESULTS FILE
   
   % open and set-up files
-  outputFile = ['./results/' mfilename() '_' subjectNumber '_' subjectName];
+  outputFile = ['./results/' subjectName '-' subjectNumber ];
   dataFile = fopen([outputFile '.txt'], 'a');
   
   % print out analysis information
@@ -524,7 +524,7 @@ function [results] = prae(subjectNumber,subjectName,startBlock,skipPrac)
   results.delay2_onsets = delay2_onsets;
   results.rate_onsets = rate_onsets;
   results.iti_onsets = iti_onsets;
-  results.stims = stim_name;
+  results.stims = stims;
   results.valence_ratings = rate;
   
   % save results structure
