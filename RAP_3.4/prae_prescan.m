@@ -47,12 +47,8 @@ function [ ] = prae_prescan(subjectNumber, subjectName)
   
   %% INSTRUCTIONS
   
-  if startBlock == 1
-      if skip == false
-        % run instructions & training
-        prae_showInstructions(window,imageLocs,colors,keys,scannerID,prac);
-      end
-  end
+  % run instructions & training
+  prae_showInstructions(window,imageLocs,colors,keys,scannerID,prac);
   
   % press "a" to exit after termination
   Screen('Flip',window);
