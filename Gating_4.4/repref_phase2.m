@@ -28,7 +28,7 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
   
   %% script version
   
-  version = '2015Jan13';
+  version = '2015July03';
   
   if ~nargin
     jalewpea_script_backup(mfilename,'./',version);
@@ -168,6 +168,7 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
   % Set up arrays to collect/report behavioral data.
   responses = zeros(stims.blocks, stims.trials_perblock);
   responseRTs = zeros(stims.blocks, stims.trials_perblock);
+  realRTs = zeros(stims.blocks, stims.trials_perblock);
   acc = zeros(stims.blocks, stims.trials_perblock);
   
   block_durations = zeros(1,stims.blocks);
@@ -177,13 +178,14 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
   delayB_onsets = zeros(stims.blocks,stims.trials_perblock);
   probe_onsets = zeros(stims.blocks,stims.trials_perblock);
   response_onsets = zeros(stims.blocks,stims.trials_perblock);
+  rsvptarget_onsets = zeros(stims.blocks,stims.trials_perblock);
   
   hand = {};
   
   % print header to Matlab window and output file
   dataFile = fopen([outputFile '.txt'], 'a');
   trial_header = sprintf(...
-    'id\tblock\ttrial\ttrial_onset\tlag\ttrial_length\tdelayA_onset\tdelayB_onset\tprobe_onset\tresponse_onset\ttype\tcat\tcond\tcue\tans\tresp\tacc\trt\trsvp\ttop\tbottom\n');
+    'id\tblock\ttrial\ttrial_onset\tlag\ttrial_length\tdelayA_onset\tdelayB_onset\tprobe_onset\tresponse_onset\ttype\tcat\tcond\tcue\tans\tresp\tacc\trt\trealrt\trsvp\ttop\tbottom\n');
   fprintf(dataFile,trial_header);
   fprintf(trial_header);
   fclose(dataFile);
@@ -203,7 +205,6 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
     
     while ~triggerKey
         
-        % % [keyIsDown,secs,keyCode,deltaSecs,devName] = repref_PniKbCheckMulti(keys);
         [keyIsDown, secs, keyCode, deltaSecs] = KbCheck(-1);
         
         % interpret relevant keypresses
@@ -214,11 +215,11 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
                 fprintf('Status = %d\n',status);
                 if status == 0
                 else
-                  msg = sprintf('Error. Scanner not initiated.');
-                  repref_drawMessage(window,msg);
-                  Screen('Flip',window);
-                  WaitSecs(2);
-                  repref_finishExperiment();
+                    msg = sprintf('Error. Scanner not initiated.');
+                    repref_drawMessage(window,msg);
+                    Screen('Flip',window);
+                    WaitSecs(2);
+                    repref_finishExperiment();
                 end
             else
                 triggerKey = false;
@@ -265,81 +266,147 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
       while (GetSecs < t_trial_start+T_TARGETab+T_DELAYa); end
       
       if ~stims.switches(i,j)
+          
         % ** stay trial **
         t_trial_stop = t_trial_start+T_STAY_TRIAL_DURATION;
         
         %------------------------------%
         % PROBEa
-        
-        % display the RSVP probes.
+       
+        % set up
         t_probe_start = GetSecs;
         registeredKeyPress = false;
         fbColor = colors.white;
-        
+        t_response_start = t_probe_start;
+       
+        % display the RSVP probes.
         probes = stims.probes1{i,j};
         t_prev_probe_end = GetSecs;
+        
         for p = 1:length(probes)
-          repref_drawImage(window,char(probes(p)),imageLocs);
-          Screen('Flip',window);
-          
-          if p == stims.rsvptarget(i,j)
-            t_rsvptarget_start = GetSecs;
-          end
-          
-          WaitSecs('UntilTime',t_prev_probe_end + T_RSVP_PROBE);
-          Screen('Flip',window);
-          WaitSecs('UntilTime',t_prev_probe_end + T_RSVP_PROBE + T_RSVP_GAP);
-          if (debug); repref_dbTimeStamp(sprintf('probe%d(rel)',p),t_prev_probe_end);end
-          t_prev_probe_end = GetSecs;
+            
+            repref_drawImage(window,char(probes(p)),imageLocs);
+            Screen('Flip',window);
+            
+            if p == stims.rsvptarget(i,j)
+                rsvptarget_onsets(i,j) = GetSecs - t_probe_start;
+            else
+                rsvptarget_onsets(i,j) = NaN;
+            end
+            
+            while (GetSecs < t_prev_probe_end+T_RSVP_PROBE)
+                
+                % accept key press
+                [keyIsDown, secs, keyCode, deltaSecs] = KbCheck(-1);
+                
+                % interpret relevant keypresses
+                if keyIsDown && ~registeredKeyPress
+                    registeredKeyPress = true;
+                    
+                    if strcmp(KbName(keyCode), keys.first)
+                        % user indicated picture was identical
+                        responses(i,j) = 1;
+                        responseRTs(i,j) = secs - t_response_start;
+                        fbColor = repref_getFeedback(colors,responses(i,j)==stims.answers(i,j));
+                        
+                    elseif strcmp(KbName(keyCode), keys.second)
+                        % user indicated picture was not identical
+                        responses(i,j) = -1;
+                        responseRTs(i,j) = secs - t_response_start;
+                        fbColor = repref_getFeedback(colors,responses(i,j)==stims.answers(i,j));
+                        
+                    else
+                        registeredKeyPress = false;
+                    end
+                end % if key press
+                
+            end % while
+            
+            % blank screen gap
+            Screen('Flip',window);
+
+            while (GetSecs < t_prev_probe_end+T_RSVP_PROBE+T_RSVP_GAP)
+                
+                % accept key press
+                [keyIsDown, secs, keyCode, deltaSecs] = KbCheck(-1);
+                
+                % interpret relevant keypresses
+                if keyIsDown && ~registeredKeyPress
+                    registeredKeyPress = true;
+                    
+                    if strcmp(KbName(keyCode), keys.first)
+                        % user indicated picture was identical
+                        responses(i,j) = 1;
+                        responseRTs(i,j) = secs - t_response_start;
+                        fbColor = repref_getFeedback(colors,responses(i,j)==stims.answers(i,j));
+                        
+                    elseif strcmp(KbName(keyCode), keys.second)
+                        % user indicated picture was not identical
+                        responses(i,j) = -1;
+                        responseRTs(i,j) = secs - t_response_start;
+                        fbColor = repref_getFeedback(colors,responses(i,j)==stims.answers(i,j));
+                        
+                    else
+                        registeredKeyPress = false;
+                    end
+                end % if key press
+                
+            end % while
+
+            if (debug); repref_dbTimeStamp(sprintf('probe%d(rel)',p),t_prev_probe_end);end
+            t_prev_probe_end = GetSecs;
+            
         end
         
-        % response window
+        % total probe time
+        t_probe = GetSecs - t_probe_start;
+        
+        % response screen
         repref_drawCircle(window,fbColor);
         Screen('Flip',window);
         if (debug); repref_dbTimeStamp('responseA',t_trial_start);end
         
-        % start RT timer @ end of all RSVP stims
-        t_response_start = t_prev_probe_end; % change to probe start
-        
+        % open response window
         while (GetSecs < t_probe_start+T_PROBEa+T_RESPONSEa)
+            
+            % accept button press
+            [keyIsDown, secs, keyCode, deltaSecs] = KbCheck(-1);
           
-          % % [keyIsDown,secs,keyCode,deltaSecs,devName] = repref_PniKbCheckMulti(keys);
-          [keyIsDown, secs, keyCode, deltaSecs] = KbCheck(-1);
-          
-          % interpret relevant keypresses
-          if keyIsDown && ~registeredKeyPress
-            registeredKeyPress = true;
-            
-            if strcmp(KbName(keyCode), keys.first)
-              % user indicated picture was identical
-              responses(i,j) = 1;
-              responseRTs(i,j) = secs - t_response_start;
-              fbColor = repref_getFeedback(colors,responses(i,j)==stims.answers(i,j));
-              
-            elseif strcmp(KbName(keyCode), keys.second)
-              % user indicated picture was not identical
-              responses(i,j) = -1;
-              responseRTs(i,j) = secs - t_response_start;
-              fbColor = repref_getFeedback(colors,responses(i,j)==stims.answers(i,j));
-              
-            else
-              registeredKeyPress = false;
-            end
-            
-            % show feedback
-            if registeredKeyPress
-              repref_drawCircle(window,fbColor);
-              Screen('Flip',window);
-            end
-            
-          end % keyIsDown
+            % interpret relevant keypresses
+            if keyIsDown && ~registeredKeyPress
+                registeredKeyPress = true;
+                
+                if strcmp(KbName(keyCode), keys.first)
+                    % user indicated picture was identical
+                    responses(i,j) = 1;
+                    responseRTs(i,j) = secs - t_response_start;
+                    fbColor = repref_getFeedback(colors,responses(i,j)==stims.answers(i,j));
+                    
+                elseif strcmp(KbName(keyCode), keys.second)
+                    % user indicated picture was not identical
+                    responses(i,j) = -1;
+                    responseRTs(i,j) = secs - t_response_start;
+                    fbColor = repref_getFeedback(colors,responses(i,j)==stims.answers(i,j));
+                    
+                else
+                    registeredKeyPress = false;
+                end
+                
+                % show feedback
+                if registeredKeyPress
+                    repref_drawCircle(window,fbColor);
+                    Screen('Flip',window);
+                end
+                
+            end % keyIsDown
           
         end % while waiting for response
-       
+        
         % place holder for results
         t_delayB_start = NaN;
         
       else
+          
         % ** switch trial **
         t_trial_stop = t_trial_start+T_SWITCH_TRIAL_DURATION;
                 
@@ -356,39 +423,99 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
         %------------------------------%
         % PROBEb
         
-        % display the RSVP probes.
+        % set up
         t_probe_start = GetSecs;
         registeredKeyPress = false;
         fbColor = colors.white;
+        t_response_start = t_probe_start;
         
+        % display the RSVP probes.
         probes = stims.probes2{i,j};
         t_prev_probe_end = GetSecs;
+        
         for p = 1:length(probes)
-          repref_drawImage(window,char(probes(p)),imageLocs);
-          Screen('Flip',window);
-          
-          if p == stims.rsvptarget(i,j)
-            t_rsvptarget_start = GetSecs;
-          end
-          
-          WaitSecs('UntilTime',t_prev_probe_end + T_RSVP_PROBE);
-          Screen('Flip',window);
-          WaitSecs('UntilTime',t_prev_probe_end + T_RSVP_PROBE + T_RSVP_GAP);
-          if (debug); repref_dbTimeStamp(sprintf('probe%d(rel)',p),t_prev_probe_end);end
-          t_prev_probe_end = GetSecs;
+            
+            % draw probes
+            repref_drawImage(window,char(probes(p)),imageLocs);
+            Screen('Flip',window);
+            
+            if p == stims.rsvptarget(i,j)
+                rsvptarget_onsets(i,j) = GetSecs - t_probe_start;
+            else
+                rsvptarget_onsets(i,j) = NaN;
+            end
+            
+            while (GetSecs < t_prev_probe_end+T_RSVP_PROBE)
+                % accept button press
+                [keyIsDown, secs, keyCode, deltaSecs] = KbCheck(-1);
+
+                % interpret relevant keypresses
+                if keyIsDown && ~registeredKeyPress
+                    registeredKeyPress = true;
+
+                    if strcmp(KbName(keyCode), keys.first)
+                        % user indicated picture was identical
+                        responses(i,j) = 1;
+                        responseRTs(i,j) = secs - t_response_start;
+                        fbColor = repref_getFeedback(colors,responses(i,j)==stims.answers(i,j));
+                        
+                    elseif strcmp(KbName(keyCode), keys.second)
+                        % user indicated picture was not identical
+                        responses(i,j) = -1;
+                        responseRTs(i,j) = secs - t_response_start;
+                        fbColor = repref_getFeedback(colors,responses(i,j)==stims.answers(i,j));
+
+                    else
+                        registeredKeyPress = false;
+                    end
+                end % if button press
+            end % while
+            
+            % blank screen gap
+            Screen('Flip',window);
+            
+            while (GetSecs < t_prev_probe_end+T_RSVP_PROBE+T_RSVP_GAP)
+                % accept button press
+                [keyIsDown, secs, keyCode, deltaSecs] = KbCheck(-1);
+
+                % interpret relevant keypresses
+                if keyIsDown && ~registeredKeyPress
+                    registeredKeyPress = true;
+
+                    if strcmp(KbName(keyCode), keys.first)
+                        % user indicated picture was identical
+                        responses(i,j) = 1;
+                        responseRTs(i,j) = secs - t_response_start;
+                        fbColor = repref_getFeedback(colors,responses(i,j)==stims.answers(i,j));
+                        
+                    elseif strcmp(KbName(keyCode), keys.second)
+                        % user indicated picture was not identical
+                        responses(i,j) = -1;
+                        responseRTs(i,j) = secs - t_response_start;
+                        fbColor = repref_getFeedback(colors,responses(i,j)==stims.answers(i,j));
+
+                    else
+                        registeredKeyPress = false;
+                    end
+                end % if button press
+            end % while
+            
+            if (debug); repref_dbTimeStamp(sprintf('probe%d(rel)',p),t_prev_probe_end);end
+            t_prev_probe_end = GetSecs;
+            
         end
         
-        % response window
+        % total probe time
+        t_probe = GetSecs - t_probe_start;
+        
+        % response screen
         repref_drawCircle(window,fbColor);
         Screen('Flip',window);
         if (debug); repref_dbTimeStamp('responseB',t_trial_start);end
         
-        % start RT timer @ end of all RSVP stims
-        t_response_start = t_prev_probe_end;
-        
+        % open response window
         while (GetSecs < t_probe_start+T_PROBEb+T_RESPONSEb)
           
-          % %  [keyIsDown,secs,keyCode,deltaSecs,devName] = repref_PniKbCheckMulti(keys);
           [keyIsDown, secs, keyCode, deltaSecs] = KbCheck(-1);
           
           % interpret relevant keypresses
@@ -407,14 +534,12 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
               responseRTs(i,j) = secs - t_response_start;
               fbColor = repref_getFeedback(colors,responses(i,j)==stims.answers(i,j));
               
-            else
-              registeredKeyPress = false;
             end
             
             % show feedback
             if registeredKeyPress
-              repref_drawCircle(window,fbColor);
-              Screen('Flip',window);
+                repref_drawCircle(window,fbColor);
+                Screen('Flip',window);
             end
             
           end % keyIsDown
@@ -423,10 +548,8 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
         
       end % trial type
       
-      if ~registeredKeyPress
-        responses(i,j) = NaN;
-        responseRTs(i,j) = NaN;
-      end
+      
+      %% ITI
       
       % Display a blank screen between trials
       repref_drawFocusCharacter(window,'+',colors.blue);
@@ -434,8 +557,47 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
       if (debug); repref_dbTimeStamp('iti',t_trial_start);end
       Screen('Close');
       
-      %% ITI
+      % leave response window open for half the ITI
+      while (GetSecs < t_probe_start+T_PROBEb+T_RESPONSEb+(.5*T_ITI))
+          
+          [keyIsDown, secs, keyCode, deltaSecs] = KbCheck(-1);
+          
+          % interpret relevant keypresses
+          if keyIsDown && ~registeredKeyPress
+              registeredKeyPress = true;
+              
+              if strcmp(KbName(keyCode), keys.first)
+                  % user indicated picture was identical
+                  responses(i,j) = 1;
+                  responseRTs(i,j) = secs - t_response_start;
+                  
+              elseif strcmp(KbName(keyCode), keys.second)
+                  % user indicated picture was not identical
+                  responses(i,j) = -1;
+                  responseRTs(i,j) = secs - t_response_start;
+                  
+              else
+                  registeredKeyPress = false;
+              end
+          end % key press
+      end % while wating
       
+      % non-response if no button press
+      if ~registeredKeyPress 
+        responses(i,j) = NaN;
+        responseRTs(i,j) = NaN;
+      end
+      
+      % adjusted RTs
+      if isnan(rsvptarget_onsets(i,j)) && ~isnan(responseRTs(i,j));
+          realRTs(i,j) = responseRTs(i,j) - t_probe;
+      elseif ~isnan(rsvptarget_onsets(i,j)) && ~isnan(responseRTs(i,j));
+          realRTs(i,j) =  responseRTs(i,j) - rsvptarget_onsets(i,j);
+      elseif isnan(responseRTs(i,j));
+          realRTs(i,j) = NaN;
+      end
+      
+      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
       % collect trial-specific information for logging
       
       % type
@@ -507,11 +669,11 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
       this.target2 = split.target2{4};
       
       % print trial results
-      trial_info = sprintf('%s\t%d\t%d\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%s\t%s\t%s\t%s\t%d\t%d\t%d\t%.3f\t%d\t%s\t%s\n',...
+      trial_info = sprintf('%s\t%d\t%d\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%s\t%s\t%s\t%s\t%d\t%d\t%d\t%.3f\t%.3f\t%d\t%s\t%s\n',...
         subjectNumber,i,j,trial_onsets(i,j),onset_delay,trial_durations(i,j),...
         delayA_onsets(i,j),delayB_onsets(i,j),probe_onsets(i,j),response_onsets(i,j),...
         type,cat,cond,cue,stims.answers(i,j),responses(i,j),...
-        acc(i,j),responseRTs(i,j),stims.rsvptarget(i,j),this.target1,this.target2);
+        acc(i,j),responseRTs(i,j),realRTs(i,j),stims.rsvptarget(i,j),this.target1,this.target2);
       
       fprintf(dataFile,trial_info);
       fprintf(trial_info);
@@ -585,6 +747,7 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
   results.accuracies = (acc);
   results.accuracy_avg = nanmean(nanmean(results.accuracies)); % don't count non-response
   results.rts = responseRTs;
+  results.realrts = realRTs;
   results.rt_avg = nanmean(nanmean(responseRTs)); % don't count non-response
   results.hand = hand;
   
