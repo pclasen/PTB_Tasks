@@ -292,6 +292,9 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
                 rsvptarget_onsets(i,j) = GetSecs - t_probe_start;
             else
                 rsvptarget_onsets(i,j) = NaN;
+                if p == length(probes)
+                    t_last_probe = GetSecs - t_probe_start;
+                end
             end
             
             while (GetSecs < t_prev_probe_end+T_RSVP_PROBE)
@@ -359,7 +362,7 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
         end
         
         % total probe time
-        t_probe = GetSecs - t_probe_start;
+        t_probe = GetSecs - t_last_probe;
         
         % response screen
         repref_drawCircle(window,fbColor);
@@ -443,6 +446,9 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
                 rsvptarget_onsets(i,j) = GetSecs - t_probe_start;
             else
                 rsvptarget_onsets(i,j) = NaN;
+                if p == length(probes)
+                    t_last_probe = GetSecs - t_probe_start;
+                end
             end
             
             while (GetSecs < t_prev_probe_end+T_RSVP_PROBE)
@@ -506,7 +512,7 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
         end
         
         % total probe time
-        t_probe = GetSecs - t_probe_start;
+        t_probe = GetSecs - t_last_probe;
         
         % response screen
         repref_drawCircle(window,fbColor);
