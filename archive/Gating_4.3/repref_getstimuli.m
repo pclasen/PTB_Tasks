@@ -251,7 +251,7 @@ function [stimuli] = repref_getstimuli(subjectNumber, subjectName, cbfaces, cbsc
       % half of blocks are 1-back, half not
       switch mod(i,2)
         case 0 % 1-back on evens  
-          p1_1back_b(i,:) = p1_1back_mat(1,:);  
+          p1_1back_b(i,:) = p1_1back_mat(1,:);  % remove everything around this to make every block a 1-back block
         case 1 % no back on odds
           p1_1back_b(i,:) = p1_1back_mat(2,:);
       end
