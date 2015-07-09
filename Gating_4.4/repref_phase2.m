@@ -361,9 +361,6 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
             
         end
         
-        % total probe time
-        t_probe = GetSecs - t_last_probe;
-        
         % response screen
         repref_drawCircle(window,fbColor);
         Screen('Flip',window);
@@ -511,9 +508,6 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
             
         end
         
-        % total probe time
-        t_probe = GetSecs - t_last_probe;
-        
         % response screen
         repref_drawCircle(window,fbColor);
         Screen('Flip',window);
@@ -596,7 +590,7 @@ function [results] = repref_phase2(subjectNumber,subjectName,startBlock,screen,c
       
       % adjusted RTs
       if isnan(rsvptarget_onsets(i,j)) && ~isnan(responseRTs(i,j));
-          realRTs(i,j) = responseRTs(i,j) - t_probe;
+          realRTs(i,j) = responseRTs(i,j) - t_last_probe;
       elseif ~isnan(rsvptarget_onsets(i,j)) && ~isnan(responseRTs(i,j));
           realRTs(i,j) =  responseRTs(i,j) - rsvptarget_onsets(i,j);
       elseif isnan(responseRTs(i,j));
